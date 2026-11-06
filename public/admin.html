@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>Blue and Pink · Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head><body><header id="brand"></header><main class="wrap panel" id="app"></main><footer id="foot"></footer><script src="/brand.js"></script>
+<script>
+const app=document.getElementById('app');
+const $=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Object.entries(a)){if(x==='class')e.className=v;else if(x.startsWith('on'))e.addEventListener(x.slice(2),v);else e.setAttribute(x,v)}k.flat().forEach(c=>e.append(c));return e};
+let key=sessionStorage.getItem('k')||'';
+async function api(path,method='GET',body){
+  const r=await fetch('/api/admin/'+path,{method,headers:{'x-admin-key':key,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||'Error');return d}
+
+function login(err=''){
+  const pw=$('input',{type:'password',placeholder:'Admin password','aria-label':'Admin password'});
+  const go=async()=>{key=pw.value;try{await api('stories');sessionStorage.setItem('k',key);list()}catch(e){login(e.message)}};
+  pw.addEventListener('keydown',e=>e.key==='Enter'&&go());
+  app.replaceChildren($('h1',{},'Admin'),$('div',{style:'display:grid;gap:10px'},pw,$('p',{class:'err ui'},err),$('div',{},$('button',{class:'btn',onclick:go},'Sign in'))));
+}
+
+async function list(){
+  let rows;try{rows=await api('stories')}catch{return login('Session expired. Sign in again.')}
+  app.replaceChildren($('div',{class:'row',style:'justify-content:space-between'},$('h1',{},'Your stories'),$('button',{class:'btn',onclick:()=>edit()},'New story')),
+    $('p',{class:'ui'},$('a',{href:'/',target:'_blank'},'View reader site')),
+    rows.length?rows.map(s=>$('div',{class:'item'},
+      $('h2',{},s.title),
+      $('p',{class:'ui muted'},s.status==='published'?'Published':'Draft'),
+      $('div',{class:'row'},$('button',{class:'btn ghost',onclick:()=>edit(s.id)},'Edit'),
+        $('button',{class:'btn danger',onclick:async()=>{if(confirm('Delete "'+s.title+'" and its comments?')){await api('stories/'+s.id,'DELETE');list()}}},'Delete')))):
+    $('p',{class:'muted'},'No stories yet. Write your first one.'));
+}
+
+async function edit(id){
+  let s={title:'',body:'',status:'draft'};
+  if(id)s=await api('stories/'+id);
+  const title=$('input',{placeholder:'Title',value:s.title,'aria-label':'Title'});
+  const body=$('textarea',{style:'min-height:55vh;font-family:Literata,Georgia,serif;font-size:18px;line-height:1.7','aria-label':'Story'});body.value=s.body;
+  const msg=$('p',{class:'ui muted'},'');
+  const save=async status=>{try{const r=await api('stories','POST',{id,title:title.value,body:body.value,status});id=r.id;
+    msg.className='ui muted';msg.textContent=status==='published'?'Published.':'Draft saved.';if(status==='published')setTimeout(list,700)}
+    catch(e){msg.className='ui err';msg.textContent=e.message}};
+  app.replaceChildren($('a',{class:'ui',href:'#',onclick:e=>{e.preventDefault();list()}},'← Back to stories'),
+    $('div',{style:'display:grid;gap:12px;margin-top:16px'},title,body,msg,
+      $('div',{class:'row'},$('button',{class:'btn ghost',onclick:()=>save('draft')},'Save draft'),
+        $('button',{class:'btn',onclick:()=>save('published')},s.status==='published'?'Update published story':'Publish'),
+        s.status==='published'?$('button',{class:'btn ghost',onclick:()=>save('draft')},'Unpublish'):'')));
+}
+key?list():login();
+</script></body></html>
