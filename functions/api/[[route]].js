@@ -11,7 +11,7 @@ export async function onRequest({ request, env, params }) {
   try {
     // ---------- Admin (password required) ----------
     if (p[0] === "admin") {
-      if (!env.ADMIN_PASSWORD || request.headers.get("x-admin-key") !== env.ADMIN_PASSWORD)
+      if (!env.ADMIN_PASSWORD || request.headers.get("x-admin-key") !== env.ADMIN_PASSWORD.trim())
         return json({ error: "Wrong password" }, 401);
 
       if (p[1] === "stories" && m === "GET" && !p[2]) {
