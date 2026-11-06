@@ -5,4 +5,4 @@ compatibility_date = "2025-01-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "stories-db"
-database_id = "PASTE-YOUR-DATABASE-ID-HERE"
+database_id = "69eeac08-6f74-4a58-b4fa-32cd246691a2"
