@@ -13,17 +13,23 @@ const date=t=>new Date(t).toLocaleDateString(undefined,{year:'numeric',month:'lo
 let voter=null;try{voter=localStorage.getItem('v')||(crypto.randomUUID());localStorage.setItem('v',voter)}catch{voter=crypto.randomUUID()}
 const liked=()=>{try{return JSON.parse(localStorage.getItem('liked')||'[]')}catch{return[]}};
 const saveLiked=a=>{try{localStorage.setItem('liked',JSON.stringify(a))}catch{}};
+const wc=t=>(t.trim().match(/\S+/g)||[]).length;
+const tagRow=(t,link)=>{const a=(t||'').split(',').filter(Boolean);return a.length?$('div',{class:'tags'},a.map(x=>link?$('a',{class:'tag',href:'#/t/'+encodeURIComponent(x)},'#'+x):$('span',{class:'tag'},'#'+x))):''};
 async function api(path,opt){const r=await fetch('/api/'+path,opt);const d=await r.json();if(!r.ok)throw new Error(d.error||'Error');return d}
 
-async function home(){
+async function home(tag){
   document.title='Blue and Pink';app.replaceChildren($('h1',{},'Stories'),$('p',{class:'muted ui'},'Loading…'));
   try{
-    const list=await api('stories');
+    let list=await api('stories');
+    if(tag)list=list.filter(s=>(s.tags||'').split(',').includes(tag));
     app.replaceChildren($('h1',{},'Stories'),
+      tag?$('p',{class:'ui'},'Showing #'+tag+' · ',$('a',{href:'#/'},'show all')):'',
       list.length?list.map(s=>$('a',{class:'item',href:'#/s/'+s.id},
-        $('h2',{},s.title),$('p',{class:'muted'},s.excerpt.replace(/\s+/g,' ')+'…'),
-        $('span',{class:'muted ui'},`${date(s.published_at)} · ${s.likes} likes · ${s.comments} comments`))):
-      $('p',{class:'muted'},'No stories yet. Check back soon.'));
+        $('h2',{},s.title),
+        s.subtitle?$('p',{class:'sub'},s.subtitle):$('p',{class:'muted'},s.excerpt.replace(/\s+/g,' ')+'…'),
+        $('span',{class:'muted ui'},`${date(s.published_at)} · ${Math.max(1,Math.round(s.words/220))} min read · ${s.likes} likes · ${s.comments} comments`),
+        tagRow(s.tags,false))):
+      $('p',{class:'muted'},tag?'No stories with this tag.':'No stories yet. Check back soon.'));
   }catch(e){app.replaceChildren($('p',{class:'err ui'},'Could not load stories. Refresh to try again.'))}
 }
 
@@ -49,7 +55,9 @@ async function story(id){
     app.replaceChildren(
       $('a',{class:'ui',href:'#/'},'← All stories'),
       $('h1',{style:'margin-top:18px'},s.title),
-      $('p',{class:'muted ui'},date(s.published_at)),
+      s.subtitle?$('p',{class:'sub'},s.subtitle):'',
+      $('p',{class:'muted ui'},`${date(s.published_at)} · ${wc(s.body).toLocaleString()} words · ${Math.max(1,Math.round(wc(s.body)/220))} min read`),
+      tagRow(s.tags,true),
       $('div',{class:'body'},s.body.split(/\n{2,}/).map(p=>$('p',{},p.trim()))),
       $('div',{class:'row',style:'margin:28px 0'},likeBtn),
       $('h2',{style:'font-size:1.2rem'},'Comments'),clist,
@@ -57,6 +65,6 @@ async function story(id){
     window.scrollTo(0,0);
   }catch(e){app.replaceChildren($('a',{class:'ui',href:'#/'},'← All stories'),$('p',{class:'err ui'},'This story is not available.'))}
 }
-function route(){const m=location.hash.match(/^#\/s\/(\d+)$/);m?story(m[1]):home()}
+function route(){const h=location.hash,m=h.match(/^#\/s\/(\d+)$/),t=h.match(/^#\/t\/(.+)$/);m?story(m[1]):home(t?decodeURIComponent(t[1]):null)}
 addEventListener('hashchange',route);route();
 </script></body></html>

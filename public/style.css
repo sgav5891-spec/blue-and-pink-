@@ -35,3 +35,11 @@ textarea{min-height:120px;resize:vertical}
 .like.on{background:var(--pink);color:var(--on-accent)}
 .err{color:#B3402F}
 @media (prefers-color-scheme:dark){.err{color:#FF9B8A}.btn.danger{border-color:#FF9B8A;color:#FF9B8A}}
+
+.sub{font-style:italic;color:var(--muted);margin:.1em 0 .6em;font-size:1.05rem;line-height:1.5}
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.tag{font:600 13px system-ui,sans-serif;padding:4px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--blue);text-decoration:none}
+.editor{min-height:55vh;font-family:"Literata",Georgia,serif;font-size:18px;line-height:1.7}
+.drop{border:2px dashed var(--line);border-radius:16px;padding:16px;text-align:center;color:var(--muted);font:15px/1.5 system-ui,sans-serif}
+.drop.over{border-color:var(--pink);background:var(--card)}
+.pick{color:var(--pink);text-decoration:underline;cursor:pointer}

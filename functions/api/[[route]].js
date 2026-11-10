@@ -1,6 +1,9 @@
 const json = (d, s = 200, h = {}) =>
   new Response(JSON.stringify(d), { status: s, headers: { "content-type": "application/json", ...h } });
 const clip = (v, n) => String(v ?? "").trim().slice(0, n);
+const cleanTags = v => [...new Set((Array.isArray(v) ? v : String(v ?? "").split(",")).map(t => String(t).trim().toLowerCase().slice(0, 30)).filter(Boolean))].slice(0, 10).join(",");
+// Set to true to require the admin password again
+const REQUIRE_PASSWORD = false;
 
 export async function onRequest({ request, env, params }) {
   const p = params.route || [];
@@ -11,7 +14,10 @@ export async function onRequest({ request, env, params }) {
   try {
     // ---------- Admin (password required) ----------
     if (p[0] === "admin") {
-     
+      if (REQUIRE_PASSWORD) {
+        if (!env.ADMIN_PASSWORD) return json({ error: "Server has no password set" }, 401);
+        if (request.headers.get("x-admin-key") !== env.ADMIN_PASSWORD.trim()) return json({ error: "Wrong password" }, 401);
+      }
 
       if (p[1] === "stories" && m === "GET" && !p[2]) {
         const r = await db.prepare("SELECT id,title,status,created_at,published_at FROM stories ORDER BY created_at DESC").all();
@@ -26,15 +32,17 @@ export async function onRequest({ request, env, params }) {
         const title = clip(b.title, 200) || "Untitled";
         const body = String(b.body ?? "").slice(0, 200000);
         const status = b.status === "published" ? "published" : "draft";
+        const subtitle = clip(b.subtitle, 300);
+        const tags = cleanTags(b.tags);
         if (b.id) {
           const old = await db.prepare("SELECT published_at FROM stories WHERE id=?").bind(b.id).first();
           const pub = status === "published" ? (old?.published_at || now) : null;
-          await db.prepare("UPDATE stories SET title=?,body=?,status=?,published_at=? WHERE id=?")
-            .bind(title, body, status, pub, b.id).run();
+          await db.prepare("UPDATE stories SET title=?,subtitle=?,tags=?,body=?,status=?,published_at=? WHERE id=?")
+            .bind(title, subtitle, tags, body, status, pub, b.id).run();
           return json({ id: b.id });
         }
-        const r = await db.prepare("INSERT INTO stories (title,body,status,created_at,published_at) VALUES (?,?,?,?,?)")
-          .bind(title, body, status, now, status === "published" ? now : null).run();
+        const r = await db.prepare("INSERT INTO stories (title,subtitle,tags,body,status,created_at,published_at) VALUES (?,?,?,?,?,?,?)")
+          .bind(title, subtitle, tags, body, status, now, status === "published" ? now : null).run();
         return json({ id: r.meta.last_row_id });
       }
       if (p[1] === "stories" && m === "DELETE" && p[2]) {
@@ -55,14 +63,15 @@ export async function onRequest({ request, env, params }) {
     // ---------- Readers (published only) ----------
     if (p[0] === "stories" && m === "GET" && !p[1]) {
       const r = await db.prepare(
-        `SELECT s.id,s.title,s.published_at,substr(s.body,1,220) AS excerpt,
+        `SELECT s.id,s.title,s.subtitle,s.tags,s.published_at,substr(s.body,1,220) AS excerpt,
+          (LENGTH(TRIM(REPLACE(s.body,char(10),' '))) - LENGTH(REPLACE(TRIM(REPLACE(s.body,char(10),' ')),' ','')) + 1) AS words,
           (SELECT COUNT(*) FROM likes l WHERE l.story_id=s.id) AS likes,
           (SELECT COUNT(*) FROM comments c WHERE c.story_id=s.id) AS comments
          FROM stories s WHERE s.status='published' ORDER BY s.published_at DESC`).all();
       return json(r.results, 200, { "cache-control": "public, max-age=30" });
     }
     if (p[0] === "stories" && m === "GET" && p[1] && !p[2]) {
-      const s = await db.prepare("SELECT id,title,body,published_at FROM stories WHERE id=? AND status='published'").bind(p[1]).first();
+      const s = await db.prepare("SELECT id,title,subtitle,tags,body,published_at FROM stories WHERE id=? AND status='published'").bind(p[1]).first();
       if (!s) return json({ error: "Not found" }, 404);
       const c = await db.prepare("SELECT id,name,text,created_at FROM comments WHERE story_id=? ORDER BY created_at ASC LIMIT 500").bind(p[1]).all();
       const l = await db.prepare("SELECT COUNT(*) AS n FROM likes WHERE story_id=?").bind(p[1]).first();

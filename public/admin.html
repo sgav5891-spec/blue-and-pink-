@@ -33,16 +33,22 @@ async function list(){
 }
 
 async function edit(id){
-  let s={title:'',body:'',status:'draft'};
+  let s={title:'',subtitle:'',tags:'',body:'',status:'draft'};
   if(id)s=await api('stories/'+id);
   const title=$('input',{placeholder:'Title',value:s.title,'aria-label':'Title'});
-  const body=$('textarea',{style:'min-height:55vh;font-family:Literata,Georgia,serif;font-size:18px;line-height:1.7','aria-label':'Story'});body.value=s.body;
+  const sub=$('input',{placeholder:'Subtitle (optional)',value:s.subtitle||'',maxlength:'300','aria-label':'Subtitle'});
+  const tags=$('input',{placeholder:'Tags, separated by commas (love, fantasy)',value:s.tags||'','aria-label':'Tags'});
+  const body=$('textarea',{class:'editor','aria-label':'Story'});body.value=s.body;
+  const count=$('span',{class:'ui muted'});
+  const upd=()=>{const n=(body.value.trim().match(/\S+/g)||[]).length;count.textContent=`${n.toLocaleString()} words · ${Math.max(1,Math.round(n/220))} min read`};
+  body.addEventListener('input',upd);upd();
   const msg=$('p',{class:'ui muted'},'');
-  const save=async status=>{try{const r=await api('stories','POST',{id,title:title.value,body:body.value,status});id=r.id;
-    msg.className='ui muted';msg.textContent=status==='published'?'Published.':'Draft saved.';if(status==='published')setTimeout(list,700)}
-    catch(e){msg.className='ui err';msg.textContent=e.message}};
+  const say=(t,bad)=>{msg.className='ui '+(bad?'err':'muted');msg.textContent=t};
+  const save=async status=>{try{const r=await api('stories','POST',{id,title:title.value,subtitle:sub.value,tags:tags.value,body:body.value,status});id=r.id;
+    say(status==='published'?'Published.':'Draft saved.');if(status==='published')setTimeout(list,700)}
+    catch(e){say(e.message,true)}};
   app.replaceChildren($('a',{class:'ui',href:'#',onclick:e=>{e.preventDefault();list()}},'← Back to stories'),
-    $('div',{style:'display:grid;gap:12px;margin-top:16px'},title,body,msg,
+    $('div',{style:'display:grid;gap:12px;margin-top:16px'},title,sub,tags,body,$('div',{},count),msg,
       $('div',{class:'row'},$('button',{class:'btn ghost',onclick:()=>save('draft')},'Save draft'),
         $('button',{class:'btn',onclick:()=>save('published')},s.status==='published'?'Update published story':'Publish'),
         s.status==='published'?$('button',{class:'btn ghost',onclick:()=>save('draft')},'Unpublish'):'')));
