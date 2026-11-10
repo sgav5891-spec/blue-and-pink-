@@ -58,7 +58,7 @@ async function story(id){
       s.subtitle?$('p',{class:'sub'},s.subtitle):'',
       $('p',{class:'muted ui'},`${date(s.published_at)} · ${wc(s.body).toLocaleString()} words · ${Math.max(1,Math.round(wc(s.body)/220))} min read`),
       tagRow(s.tags,true),
-      $('div',{class:'body'},s.body.split(/\n{2,}/).map(p=>$('p',{},p.trim()))),
+      $('div',{class:'body'},$('p',{},s.body.replace(/\r\n?/g,'\n').replace(/[ \t\u00A0]+$/gm,'').replace(/\n{3,}/g,'\n\n').trim())),
       $('div',{class:'row',style:'margin:28px 0'},likeBtn),
       $('h2',{style:'font-size:1.2rem'},'Comments'),clist,
       $('div',{style:'display:grid;gap:10px;margin-top:20px'},name,text,msg,$('div',{},send)));
