@@ -42,9 +42,11 @@ async function edit(id){
   const count=$('span',{class:'ui muted'});
   const upd=()=>{const n=(body.value.trim().match(/\S+/g)||[]).length;count.textContent=`${n.toLocaleString()} words · ${Math.max(1,Math.round(n/220))} min read`};
   body.addEventListener('input',upd);upd();
+  const tidy=t=>t.replace(/\r\n?/g,'\n').replace(/[ \t\u00A0]+$/gm,'').replace(/\n{3,}/g,'\n\n');
+body.addEventListener('paste',e=>{const t=(e.clipboardData||window.clipboardData).getData('text');if(!t)return;e.preventDefault();document.execCommand('insertText',false,tidy(t));upd()});
   const msg=$('p',{class:'ui muted'},'');
   const say=(t,bad)=>{msg.className='ui '+(bad?'err':'muted');msg.textContent=t};
-  const save=async status=>{try{const r=await api('stories','POST',{id,title:title.value,subtitle:sub.value,tags:tags.value,body:body.value,status});id=r.id;
+  const save=async status=>{try{const r=await api('stories','POST',{id,title:title.value,subtitle:sub.value,tags:tags.value,body:tidy(body.value).trim(),status});id=r.id;
     say(status==='published'?'Published.':'Draft saved.');if(status==='published')setTimeout(list,700)}
     catch(e){say(e.message,true)}};
   app.replaceChildren($('a',{class:'ui',href:'#',onclick:e=>{e.preventDefault();list()}},'← Back to stories'),
