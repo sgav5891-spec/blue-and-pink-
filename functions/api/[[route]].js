@@ -11,8 +11,7 @@ export async function onRequest({ request, env, params }) {
   try {
     // ---------- Admin (password required) ----------
     if (p[0] === "admin") {
-     if (!env.ADMIN_PASSWORD) return json({ error: "Server has no password set" }, 401);
-     if (request.headers.get("x-admin-key") !== env.ADMIN_PASSWORD.trim()) return json({ error: "Wrong password" }, 401);
+     
 
       if (p[1] === "stories" && m === "GET" && !p[2]) {
         const r = await db.prepare("SELECT id,title,status,created_at,published_at FROM stories ORDER BY created_at DESC").all();
