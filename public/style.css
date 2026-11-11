@@ -43,3 +43,10 @@ textarea{min-height:120px;resize:vertical}
 .drop{border:2px dashed var(--line);border-radius:16px;padding:16px;text-align:center;color:var(--muted);font:15px/1.5 system-ui,sans-serif}
 .drop.over{border-color:var(--pink);background:var(--card)}
 .pick{color:var(--pink);text-decoration:underline;cursor:pointer}
+
+.item-head{cursor:pointer}
+.item-head:focus-visible{outline:3px solid var(--blue);outline-offset:4px;border-radius:8px}
+.item-head:hover h2,.item-head[aria-expanded=true] h2{color:var(--pink)}
+.item:hover .story-body h2{color:var(--ink)}
+.hint{font:600 13px system-ui,sans-serif;color:var(--blue)}
+.story-body{padding:10px 0 22px}

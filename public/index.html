@@ -8,63 +8,87 @@
 </head><body><header id="brand"></header><main class="wrap panel" id="app"><p class="muted ui">Loading…</p></main><footer id="foot"></footer><script src="/brand.js"></script>
 <script>
 const app=document.getElementById('app');
+const show=(...k)=>app.replaceChildren(...k.flat());
 const $=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Object.entries(a)){if(x==='class')e.className=v;else if(x.startsWith('on'))e.addEventListener(x.slice(2),v);else e.setAttribute(x,v)}k.flat().forEach(c=>e.append(c));return e};
 const date=t=>new Date(t).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+const wc=t=>(t.trim().match(/\S+/g)||[]).length;
+const mins=n=>Math.max(1,Math.round(n/220));
+const tidy=t=>t.replace(/\r\n?/g,'\n').replace(/[ \t\u00A0]+$/gm,'').replace(/\n{3,}/g,'\n\n').trim();
+const tagRow=(t,link)=>{const a=(t||'').split(',').filter(Boolean);return a.length?$('div',{class:'tags'},a.map(x=>link?$('a',{class:'tag',href:'#/t/'+encodeURIComponent(x)},'#'+x):$('span',{class:'tag'},'#'+x))):''};
 let voter=null;try{voter=localStorage.getItem('v')||(crypto.randomUUID());localStorage.setItem('v',voter)}catch{voter=crypto.randomUUID()}
 const liked=()=>{try{return JSON.parse(localStorage.getItem('liked')||'[]')}catch{return[]}};
 const saveLiked=a=>{try{localStorage.setItem('liked',JSON.stringify(a))}catch{}};
-const wc=t=>(t.trim().match(/\S+/g)||[]).length;
-const tagRow=(t,link)=>{const a=(t||'').split(',').filter(Boolean);return a.length?$('div',{class:'tags'},a.map(x=>link?$('a',{class:'tag',href:'#/t/'+encodeURIComponent(x)},'#'+x):$('span',{class:'tag'},'#'+x))):''};
 async function api(path,opt){const r=await fetch('/api/'+path,opt);const d=await r.json();if(!r.ok)throw new Error(d.error||'Error');return d}
 
-async function home(tag){
-  document.title='Blue and Pink';app.replaceChildren($('h1',{},'Stories'),$('p',{class:'muted ui'},'Loading…'));
+async function fill(box,id){
+  const s=await api('stories/'+id);
+  const likeBtn=$('button',{class:'btn ghost like'+(liked().includes(s.id)?' on':''),'aria-label':'Like this story'});
+  const setLike=n=>{likeBtn.textContent=`♥ ${n}`};setLike(s.likes);
+  likeBtn.onclick=async()=>{try{const r=await api(`stories/${s.id}/like`,{method:'POST',body:JSON.stringify({voter})});
+    likeBtn.classList.toggle('on',r.liked);setLike(r.likes);
+    let a=liked().filter(x=>x!==s.id);if(r.liked)a.push(s.id);saveLiked(a)}catch{}};
+  const clist=$('div'),msg=$('p',{class:'ui err'});
+  const draw=cs=>clist.replaceChildren(...cs.map(c=>$('div',{class:'comment'},$('b',{},c.name),' ',$('span',{class:'muted ui'},date(c.created_at)),$('p',{},c.text))));
+  draw(s.comments);
+  const name=$('input',{placeholder:'Your name (optional)',maxlength:'40','aria-label':'Your name'});
+  const text=$('textarea',{placeholder:'Leave a comment…',maxlength:'1000','aria-label':'Comment'});
+  const send=$('button',{class:'btn'},'Post comment');
+  send.onclick=async()=>{msg.textContent='';send.disabled=true;
+    try{await api(`stories/${s.id}/comments`,{method:'POST',body:JSON.stringify({name:name.value,text:text.value})});
+      text.value='';const f=await api('stories/'+s.id,{cache:'no-store'});draw(f.comments)}catch(e){msg.textContent=e.message}
+    send.disabled=false};
+  const n=wc(s.body);
+  box.replaceChildren(
+    $('p',{class:'muted ui'},`${n.toLocaleString()} words · ${mins(n)} min read`),
+    tagRow(s.tags,true),
+    $('div',{class:'body',style:'margin-top:14px'},$('p',{},tidy(s.body))),
+    $('div',{class:'row',style:'margin:24px 0'},likeBtn),
+    $('h2',{style:'font-size:1.2rem'},'Comments'),clist,
+    $('div',{style:'display:grid;gap:10px;margin-top:20px'},name,text,msg,$('div',{},send)));
+}
+
+function card(s){
+  const hint=$('span',{class:'hint'},'Read ▾');
+  const head=$('div',{class:'item-head',role:'button',tabindex:'0','aria-expanded':'false'},
+    $('h2',{},s.title),
+    s.subtitle?$('p',{class:'sub'},s.subtitle):$('p',{class:'muted'},s.excerpt.replace(/\s+/g,' ')+'…'),
+    $('span',{class:'muted ui'},`${date(s.published_at)} · ${mins(s.words||1)} min read · ${s.likes} likes · ${s.comments} comments · `),hint,
+    tagRow(s.tags,false));
+  const body=$('div',{class:'story-body',hidden:''});
+  let loaded=false;
+  const close=()=>{body.hidden=true;head.setAttribute('aria-expanded','false');hint.textContent='Read ▾'};
+  const toggle=async force=>{
+    if(!body.hidden&&force!==true){close();history.replaceState(null,'','#/');return}
+    document.querySelectorAll('.item').forEach(i=>{if(i!==el&&i._close)i._close()});
+    body.hidden=false;head.setAttribute('aria-expanded','true');hint.textContent='Close ▴';
+    history.replaceState(null,'','#/s/'+s.id);
+    if(!loaded){
+      body.replaceChildren($('p',{class:'muted ui'},'Loading…'));
+      try{await fill(body,s.id);loaded=true}
+      catch{body.replaceChildren($('p',{class:'err ui'},'Could not load this story. Close it and try again.'))}
+    }
+    head.scrollIntoView({behavior:'smooth',block:'start'});
+  };
+  head.addEventListener('click',()=>toggle());
+  head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}});
+  const el=$('div',{class:'item'},head,body);
+  el._close=close;el._open=()=>toggle(true);
+  return el;
+}
+
+async function home(tag,openId){
+  document.title='Blue and Pink';
+  show($('h1',{},'Stories'),$('p',{class:'muted ui'},'Loading…'));
   try{
     let list=await api('stories');
     if(tag)list=list.filter(s=>(s.tags||'').split(',').includes(tag));
-    app.replaceChildren($('h1',{},'Stories'),
+    const cards=list.map(card);
+    show($('h1',{},'Stories'),
       tag?$('p',{class:'ui'},'Showing #'+tag+' · ',$('a',{href:'#/'},'show all')):'',
-      list.length?list.map(s=>$('a',{class:'item',href:'#/s/'+s.id},
-        $('h2',{},s.title),
-        s.subtitle?$('p',{class:'sub'},s.subtitle):$('p',{class:'muted'},s.excerpt.replace(/\s+/g,' ')+'…'),
-        $('span',{class:'muted ui'},`${date(s.published_at)} · ${Math.max(1,Math.round(s.words/220))} min read · ${s.likes} likes · ${s.comments} comments`),
-        tagRow(s.tags,false))):
-      $('p',{class:'muted'},tag?'No stories with this tag.':'No stories yet. Check back soon.'));
-  }catch(e){app.replaceChildren($('p',{class:'err ui'},'Could not load stories. Refresh to try again.'))}
+      cards.length?cards:$('p',{class:'muted'},tag?'No stories with this tag.':'No stories yet. Check back soon.'));
+    if(openId){const i=list.findIndex(s=>String(s.id)===String(openId));if(i>-1)cards[i]._open()}
+  }catch(e){show($('p',{class:'err ui'},'Could not load stories. Refresh to try again.'))}
 }
-
-async function story(id){
-  app.replaceChildren($('p',{class:'muted ui'},'Loading…'));
-  try{
-    const s=await api('stories/'+id);document.title=s.title;
-    const likeBtn=$('button',{class:'btn ghost like'+(liked().includes(s.id)?' on':''),'aria-label':'Like this story'});
-    const setLike=n=>{likeBtn.textContent=`♥ ${n}`};setLike(s.likes);
-    likeBtn.onclick=async()=>{try{const r=await api(`stories/${s.id}/like`,{method:'POST',body:JSON.stringify({voter})});
-      likeBtn.classList.toggle('on',r.liked);setLike(r.likes);
-      let a=liked().filter(x=>x!==s.id);if(r.liked)a.push(s.id);saveLiked(a)}catch{}};
-    const clist=$('div'),msg=$('p',{class:'ui err'});
-    const draw=cs=>clist.replaceChildren(...cs.map(c=>$('div',{class:'comment'},$('b',{},c.name),' ',$('span',{class:'muted ui'},date(c.created_at)),$('p',{},c.text))));
-    draw(s.comments);
-    const name=$('input',{placeholder:'Your name (optional)',maxlength:'40','aria-label':'Your name'});
-    const text=$('textarea',{placeholder:'Leave a comment…',maxlength:'1000','aria-label':'Comment'});
-    const send=$('button',{class:'btn'},'Post comment');
-    send.onclick=async()=>{msg.textContent='';send.disabled=true;
-      try{await api(`stories/${s.id}/comments`,{method:'POST',body:JSON.stringify({name:name.value,text:text.value})});
-        text.value='';const f=await api('stories/'+s.id);draw(f.comments)}catch(e){msg.textContent=e.message}
-      send.disabled=false};
-    app.replaceChildren(
-      $('a',{class:'ui',href:'#/'},'← All stories'),
-      $('h1',{style:'margin-top:18px'},s.title),
-      s.subtitle?$('p',{class:'sub'},s.subtitle):'',
-      $('p',{class:'muted ui'},`${date(s.published_at)} · ${wc(s.body).toLocaleString()} words · ${Math.max(1,Math.round(wc(s.body)/220))} min read`),
-      tagRow(s.tags,true),
-      $('div',{class:'body'},$('p',{},s.body.replace(/\r\n?/g,'\n').replace(/[ \t\u00A0]+$/gm,'').replace(/\n{3,}/g,'\n\n').trim())),
-      $('div',{class:'row',style:'margin:28px 0'},likeBtn),
-      $('h2',{style:'font-size:1.2rem'},'Comments'),clist,
-      $('div',{style:'display:grid;gap:10px;margin-top:20px'},name,text,msg,$('div',{},send)));
-    window.scrollTo(0,0);
-  }catch(e){app.replaceChildren($('a',{class:'ui',href:'#/'},'← All stories'),$('p',{class:'err ui'},'This story is not available.'))}
-}
-function route(){const h=location.hash,m=h.match(/^#\/s\/(\d+)$/),t=h.match(/^#\/t\/(.+)$/);m?story(m[1]):home(t?decodeURIComponent(t[1]):null)}
+function route(){const h=location.hash,m=h.match(/^#\/s\/(\d+)$/),t=h.match(/^#\/t\/(.+)$/);home(t?decodeURIComponent(t[1]):null,m?m[1]:null)}
 addEventListener('hashchange',route);route();
 </script></body></html>

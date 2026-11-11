@@ -7,6 +7,7 @@
 </head><body><header id="brand"></header><main class="wrap panel" id="app"></main><footer id="foot"></footer><script src="/brand.js"></script>
 <script>
 const app=document.getElementById('app');
+const show=(...k)=>app.replaceChildren(...k.flat());
 const $=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Object.entries(a)){if(x==='class')e.className=v;else if(x.startsWith('on'))e.addEventListener(x.slice(2),v);else e.setAttribute(x,v)}k.flat().forEach(c=>e.append(c));return e};
 let key=sessionStorage.getItem('k')||'';
 async function api(path,method='GET',body){
@@ -17,13 +18,13 @@ function login(err=''){
   const pw=$('input',{type:'password',placeholder:'Admin password','aria-label':'Admin password'});
   const go=async()=>{key=pw.value;try{await api('stories');sessionStorage.setItem('k',key);list()}catch(e){login(e.message)}};
   pw.addEventListener('keydown',e=>e.key==='Enter'&&go());
-  app.replaceChildren($('h1',{},'Admin'),$('div',{style:'display:grid;gap:10px'},pw,$('p',{class:'err ui'},err),$('div',{},$('button',{class:'btn',onclick:go},'Sign in'))));
+  show($('h1',{},'Admin'),$('div',{style:'display:grid;gap:10px'},pw,$('p',{class:'err ui'},err),$('div',{},$('button',{class:'btn',onclick:go},'Sign in'))));
 }
 
 async function list(){
   let rows;try{rows=await api('stories')}catch{return login('Session expired. Sign in again.')}
-  app.replaceChildren($('div',{class:'row',style:'justify-content:space-between'},$('h1',{},'Your stories'),$('button',{class:'btn',onclick:()=>edit()},'New story')),
-    $('p',{class:'ui'},$('a',{href:'/',target:'_blank'},'View reader site')),
+  show($('div',{class:'row',style:'justify-content:space-between'},$('h1',{},'Your stories'),$('button',{class:'btn',onclick:()=>edit()},'New story')),
+    $('p',{class:'ui'},$('a',{href:'/'},'View reader site')),
     rows.length?rows.map(s=>$('div',{class:'item'},
       $('h2',{},s.title),
       $('p',{class:'ui muted'},s.status==='published'?'Published':'Draft'),
@@ -43,13 +44,13 @@ async function edit(id){
   const upd=()=>{const n=(body.value.trim().match(/\S+/g)||[]).length;count.textContent=`${n.toLocaleString()} words · ${Math.max(1,Math.round(n/220))} min read`};
   body.addEventListener('input',upd);upd();
   const tidy=t=>t.replace(/\r\n?/g,'\n').replace(/[ \t\u00A0]+$/gm,'').replace(/\n{3,}/g,'\n\n');
-body.addEventListener('paste',e=>{const t=(e.clipboardData||window.clipboardData).getData('text');if(!t)return;e.preventDefault();document.execCommand('insertText',false,tidy(t));upd()});
+  body.addEventListener('paste',e=>{const t=(e.clipboardData||window.clipboardData).getData('text');if(!t)return;e.preventDefault();document.execCommand('insertText',false,tidy(t));upd()});
   const msg=$('p',{class:'ui muted'},'');
   const say=(t,bad)=>{msg.className='ui '+(bad?'err':'muted');msg.textContent=t};
   const save=async status=>{try{const r=await api('stories','POST',{id,title:title.value,subtitle:sub.value,tags:tags.value,body:tidy(body.value).trim(),status});id=r.id;
     say(status==='published'?'Published.':'Draft saved.');if(status==='published')setTimeout(list,700)}
     catch(e){say(e.message,true)}};
-  app.replaceChildren($('a',{class:'ui',href:'#',onclick:e=>{e.preventDefault();list()}},'← Back to stories'),
+  show($('a',{class:'ui',href:'#',onclick:e=>{e.preventDefault();list()}},'← Back to stories'),
     $('div',{style:'display:grid;gap:12px;margin-top:16px'},title,sub,tags,body,$('div',{},count),msg,
       $('div',{class:'row'},$('button',{class:'btn ghost',onclick:()=>save('draft')},'Save draft'),
         $('button',{class:'btn',onclick:()=>save('published')},s.status==='published'?'Update published story':'Publish'),
